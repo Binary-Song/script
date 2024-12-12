@@ -1,7 +1,7 @@
 ﻿# !!!! run in x64 dev command prompt !!!!
 # install rust, npm and swig first!
 
-
+Set-PSDebug -Trace 1
 $workspace = Get-Location
 
 git clone https://gitee.com/openharmony/third_party_llvm-project.git llvm
@@ -30,13 +30,12 @@ if ($LastExitCode -ne 0)  { exit $LastExitCode }
 cmake --install llvm_build --config Release
 if ($LastExitCode -ne 0)  { exit $LastExitCode }
 
+
 cmake -S codelldb -B codelldb_build -DCMAKE_TOOLCHAIN_FILE="$workspace\codelldb\cmake\toolchain-x86_64-windows-msvc.cmake" -DLLDB_PACKAGE="$workspace\llvm_install"
-if ($LastExitCode -ne 0)  { exit $LastExitCode }
-
-Push-Location codelldb_build
+Push-Location codelldb 
 npm install
-if ($LastExitCode -ne 0)  { exit $LastExitCode }
 Pop-Location
-
+if ($LastExitCode -ne 0)  { exit $LastExitCode }
 cmake --build codelldb_build --config Release --target vsix_full
 if ($LastExitCode -ne 0)  { exit $LastExitCode }
+Pop-Location
