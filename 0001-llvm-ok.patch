@@ -1,0 +1,148 @@
+From 27ae70b5882da9e29b9b5ffcb50876510da6f9ad Mon Sep 17 00:00:00 2001
+From: yangerhang <yeh189@126.com>
+Date: Thu, 12 Dec 2024 21:50:29 +0800
+Subject: [PATCH] llvm ok
+
+---
+ lldb/bindings/interfaces.swig                 |  2 ++
+ lldb/bindings/python/python-typemaps.swig     |  2 +-
+ lldb/include/lldb/API/SBInstruction.h         |  2 ++
+ lldb/include/lldb/API/SBStructuredData.h      |  2 ++
+ lldb/source/API/SBInstruction.cpp             | 19 +++++++++++++++++++
+ lldb/source/API/SBStructuredData.cpp          |  6 ++++++
+ .../Plugins/Platform/HOS/PlatformHOS.cpp      | 11 +----------
+ 7 files changed, 33 insertions(+), 11 deletions(-)
+
+diff --git a/lldb/bindings/interfaces.swig b/lldb/bindings/interfaces.swig
+index c9a6d0f06056..eddefbf9f93b 100644
+--- a/lldb/bindings/interfaces.swig
++++ b/lldb/bindings/interfaces.swig
+@@ -2,7 +2,9 @@
+ #define __extension__ /* Undefine GCC keyword to make Swig happy when processing glibc's stdint.h. */
+ /* The ISO C99 standard specifies that in C++ implementations limit macros such
+    as INT32_MAX should only be defined if __STDC_LIMIT_MACROS is. */
++#ifndef __STDC_LIMIT_MACROS
+ #define __STDC_LIMIT_MACROS
++#endif
+ %include "stdint.i"
+ 
+ %include "lldb/lldb-defines.h"
+diff --git a/lldb/bindings/python/python-typemaps.swig b/lldb/bindings/python/python-typemaps.swig
+index bf3de66b91bf..d45431c771ca 100644
+--- a/lldb/bindings/python/python-typemaps.swig
++++ b/lldb/bindings/python/python-typemaps.swig
+@@ -435,7 +435,7 @@ template <> bool SetNumberFromPyObject<double>(double &number, PyObject *obj) {
+ 
+ %typemap(out) lldb::FileSP {
+   $result = nullptr;
+-  lldb::FileSP &sp = $1;
++  const lldb::FileSP &sp = $1;
+   if (sp) {
+     PythonFile pyfile = unwrapOrSetPythonException(PythonFile::FromFile(*sp));
+     if (!pyfile.IsValid())
+diff --git a/lldb/include/lldb/API/SBInstruction.h b/lldb/include/lldb/API/SBInstruction.h
+index b9d781550b5d..def9482b02ed 100644
+--- a/lldb/include/lldb/API/SBInstruction.h
++++ b/lldb/include/lldb/API/SBInstruction.h
+@@ -43,6 +43,8 @@ public:
+ 
+   const char *GetComment(lldb::SBTarget target);
+ 
++  lldb::InstructionControlFlowKind GetControlFlowKind(lldb::SBTarget target);
++
+   lldb::SBData GetData(lldb::SBTarget target);
+ 
+   size_t GetByteSize();
+diff --git a/lldb/include/lldb/API/SBStructuredData.h b/lldb/include/lldb/API/SBStructuredData.h
+index 533dcc8fc07c..bef373de47dc 100644
+--- a/lldb/include/lldb/API/SBStructuredData.h
++++ b/lldb/include/lldb/API/SBStructuredData.h
+@@ -65,6 +65,8 @@ public:
+   /// Return the integer value if this data structure is an integer type.
+   uint64_t GetIntegerValue(uint64_t fail_value = 0) const;
+ 
++  int64_t GetSignedIntegerValue(int64_t fail_value = 0) const;
++
+   /// Return the floating point value if this data structure is a floating
+   /// type.
+   double GetFloatValue(double fail_value = 0.0) const;
+diff --git a/lldb/source/API/SBInstruction.cpp b/lldb/source/API/SBInstruction.cpp
+index ced22628a297..b03d8f73d66e 100644
+--- a/lldb/source/API/SBInstruction.cpp
++++ b/lldb/source/API/SBInstruction.cpp
+@@ -164,6 +164,25 @@ const char *SBInstruction::GetComment(SBTarget target) {
+   return nullptr;
+ }
+ 
++lldb::InstructionControlFlowKind SBInstruction::GetControlFlowKind(lldb::SBTarget target) {
++  LLDB_INSTRUMENT_VA(this, target);
++
++  lldb::InstructionSP inst_sp(GetOpaque());
++  if (inst_sp) {
++    ExecutionContext exe_ctx;
++    TargetSP target_sp(target.GetSP());
++    std::unique_lock<std::recursive_mutex> lock;
++    if (target_sp) {
++      lock = std::unique_lock<std::recursive_mutex>(target_sp->GetAPIMutex());
++
++      target_sp->CalculateExecutionContext(exe_ctx);
++      exe_ctx.SetProcessSP(target_sp->GetProcessSP());
++    }
++    return inst_sp->GetControlFlowKind(&exe_ctx);
++  }
++  return lldb::eInstructionControlFlowKindUnknown;
++}
++
+ size_t SBInstruction::GetByteSize() {
+   LLDB_INSTRUMENT_VA(this);
+ 
+diff --git a/lldb/source/API/SBStructuredData.cpp b/lldb/source/API/SBStructuredData.cpp
+index 498bcdd39e44..35e54c6ad9e7 100644
+--- a/lldb/source/API/SBStructuredData.cpp
++++ b/lldb/source/API/SBStructuredData.cpp
+@@ -168,6 +168,12 @@ uint64_t SBStructuredData::GetIntegerValue(uint64_t fail_value) const {
+   return m_impl_up->GetIntegerValue(fail_value);
+ }
+ 
++int64_t SBStructuredData::GetSignedIntegerValue(int64_t fail_value) const {
++  LLDB_INSTRUMENT_VA(this, fail_value);
++
++  return m_impl_up->GetIntegerValue(fail_value);
++}
++
+ double SBStructuredData::GetFloatValue(double fail_value) const {
+   LLDB_INSTRUMENT_VA(this, fail_value);
+ 
+diff --git a/lldb/source/Plugins/Platform/HOS/PlatformHOS.cpp b/lldb/source/Plugins/Platform/HOS/PlatformHOS.cpp
+index 506a3683b931..4b8bbc4998ca 100644
+--- a/lldb/source/Plugins/Platform/HOS/PlatformHOS.cpp
++++ b/lldb/source/Plugins/Platform/HOS/PlatformHOS.cpp
+@@ -19,10 +19,7 @@
+ #include "HdcClient.h"
+ #include "PlatformHOS.h"
+ #include "PlatformHOSRemoteGDBServer.h"
+-#if defined __MINGW32__
+-// SetEnvironmentVariableA
+-#include <processenv.h>
+-#endif
++#include <Windows.h>
+ 
+ using namespace lldb;
+ using namespace lldb_private;
+@@ -46,13 +43,7 @@ static constexpr std::array<PrefixMap, 7> PATH_PREFIX_MAP {{
+ }};
+ 
+ static void platform_setenv(const char *env, const char *val) {
+-#if HAVE_SETENV || _MSC_VER
+-  setenv(env, val, true);
+-#elif defined(__MINGW32__)
+   SetEnvironmentVariableA(env, val);
+-#else
+-#error "setenv not found"
+-#endif
+ }
+ 
+ void PlatformHOS::Initialize() {
+-- 
+2.46.0.windows.1
+

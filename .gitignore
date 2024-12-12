@@ -1,0 +1,8 @@
+﻿# Ignore everything
+*
+
+# Except .ps1 and .patch files
+!*.ps1
+!*.patch
+!.gitignore
+

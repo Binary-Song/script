@@ -1,0 +1,24 @@
+From 5ef0274d4b643a1b2342d5f4918c11f8db78264f Mon Sep 17 00:00:00 2001
+From: yangerhang <yeh189@126.com>
+Date: Thu, 12 Dec 2024 22:28:16 +0800
+Subject: [PATCH] codelldb ok
+
+---
+ lldb/CMakeLists.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/lldb/CMakeLists.txt b/lldb/CMakeLists.txt
+index 4aab416..eef9b99 100644
+--- a/lldb/CMakeLists.txt
++++ b/lldb/CMakeLists.txt
+@@ -20,6 +20,7 @@ else()
+     file(REMOVE_RECURSE ${CMAKE_CURRENT_BINARY_DIR}/lib)
+     file(CREATE_LINK ${LLDB_PACKAGE}/bin ${CMAKE_CURRENT_BINARY_DIR}/bin SYMBOLIC)
+     file(CREATE_LINK ${LLDB_PACKAGE}/lib ${CMAKE_CURRENT_BINARY_DIR}/lib SYMBOLIC)
++    file(CREATE_LINK ${LLDB_PACKAGE}/include ${CMAKE_CURRENT_BINARY_DIR}/include SYMBOLIC)
+ 
+     # Don't check dependencies in symlinked LLDB, as it contains many files that won't be included in the package.
+ endif()
+-- 
+2.46.0.windows.1
+
